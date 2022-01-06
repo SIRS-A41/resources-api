@@ -8,8 +8,6 @@ ADD pubspec.* /app/
 RUN pub get
 ADD . /app
 
-ENV ISSUER, SECRET_KEY, CLIENT_ID, CLIENT_SECRET
-
 # Ensure packages are still up-to-date if anything has changed
 RUN pub get --offline
 
