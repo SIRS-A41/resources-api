@@ -16,11 +16,3 @@ services:
       - "mongo"
     ports:
       - 8081:8081
-
-  #dart-api:
-    #restart: on-failure
-    #hostname: hostname
-    #build:
-      #context: .
-    #depends_on:
-      #- "mongo"
