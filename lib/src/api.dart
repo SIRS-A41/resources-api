@@ -1,12 +1,6 @@
 import 'dart:convert';
 
 import '../server.dart';
-import 'mongo.dart';
-
-import 'utils.dart';
-
-import 'package:shelf/shelf.dart';
-import 'package:shelf_router/shelf_router.dart';
 
 final RegExp regexDocumentPath = RegExp(r'^[a-zA-Z0-9_-]+\/[a-z0-9]+$');
 final RegExp regexCollectionPath = RegExp(r'^[a-zA-Z0-9_-]+\/?$');
@@ -35,6 +29,11 @@ class Api {
               body: 'Provide a public key as {key: <pub-key>}');
         }
         final publicKey = data['key'];
+
+        if (await mongo.hasUserKey(userId)) {
+          return Response(HttpStatus.badRequest,
+              body: 'User already has public key');
+        }
 
         await mongo.setPublicKey(userId, publicKey);
 
@@ -67,10 +66,14 @@ class Api {
         }
         final name = data['name'];
 
-        await mongo.createProject(userId, name);
+        if (await mongo.userHasProject(userId, name)) {
+          return Response(HttpStatus.badRequest,
+              body: 'User already has project named $name');
+        }
 
+        await mongo.createProject(userId, name);
         return Response.ok(
-          'Successfully set public key',
+          'Successfully created project',
         );
       } on FormatException {
         return Response(HttpStatus.badRequest,

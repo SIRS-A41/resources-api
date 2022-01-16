@@ -1,6 +1,13 @@
+import 'dart:convert';
+
 import 'package:shelf/shelf.dart';
+import 'package:http/http.dart' as http;
 
 import '../server.dart';
+
+const String AUTH_API_HOSTNAME = '192.168.1.136:8000';
+const String BASIC_AUTHORIZATION =
+    'Basic QzZFNTlCMjlBRDZEODRCMEU0RUJGQjAzNkRFNzVFMUQ6VjJaMnBBdEZhYUQ3THRVaHRHYkJOQTUraUtDajFmdysybSttNlhVaDdUWT0=';
 
 Middleware handleCors() {
   const corsHeaders = {
@@ -31,7 +38,12 @@ Middleware handleAuth() {
         if (authHeader.startsWith('Bearer ')) {
           final token = authHeader.substring(7);
 
-          final userId = verifyJwt(token);
+          final userId = await verifyJwt(token);
+          if (userId == null) {
+            return Response.forbidden(
+              'Not authorized to perform this action.',
+            );
+          }
 
           final updatedRequest = request.change(context: {
             'userId': userId,
@@ -53,7 +65,7 @@ Middleware checkAuthorization() {
   return createMiddleware(
     requestHandler: (Request request) {
       final userId = request.context['userId'];
-      if (userId == null || request.headers['user'] != userId) {
+      if (userId == null) {
         return Response.forbidden('Not authorized to perform this action.');
       }
       return null;
@@ -74,7 +86,22 @@ Middleware logUserRequests() {
   );
 }
 
-// todo: Validate token
-Future<String> verifyJwt(String token) async {
-  return 'userId';
+Future<String?> verifyJwt(String token) async {
+  final url = Uri.http(AUTH_API_HOSTNAME, '/auth/validate');
+  final response = await http.post(
+    url,
+    headers: {
+      'Authorization': BASIC_AUTHORIZATION,
+      'Content-Type': 'application/json',
+    },
+    body: jsonEncode(
+      {'access_token': token},
+    ),
+  );
+
+  if (response.statusCode == 200) {
+    return response.body;
+  } else {
+    return null;
+  }
 }

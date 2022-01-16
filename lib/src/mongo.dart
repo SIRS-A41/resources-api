@@ -28,27 +28,24 @@ class Mongo {
   }
 
   Future<void> setPublicKey(String userId, String publicKey) async {
-    if (await hasUserKey(userId)) {
-      await keys.replaceOne(where.eq('userId', userId), {
-        'userId': userId,
-        'key': publicKey,
-      });
-    } else {
-      await keys.insertOne({
-        'userId': userId,
-        'key': publicKey,
-      });
-    }
+    await keys.insertOne({
+      'userId': userId,
+      'key': publicKey,
+    });
   }
 
-  Future<bool> createProject(String userId, String name) async {
+  Future<bool> userHasProject(String userId, String name) async {
     final userProjects = projects.collection(userId);
     final result = await userProjects.findOne(where.eq('name', name));
+    return result != null;
+  }
 
-    if (result == null) return false;
-
-    await userProjects.insertOne({'name': name, 'created_at': DateTime.now()});
-
-    return true;
+  Future<void> createProject(String userId, String name) async {
+    final userProjects = projects.collection(userId);
+    await userProjects.insertOne({
+      'name': name,
+      'owner': userId,
+      'created_at': DateTime.now().millisecondsSinceEpoch ~/ 1000
+    });
   }
 }
