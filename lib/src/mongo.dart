@@ -1,3 +1,4 @@
+import 'package:auth_api/src/encrypt.dart';
 import 'package:mongo_dart/mongo_dart.dart';
 
 typedef MongoFunction = Function(Db db);
@@ -40,12 +41,25 @@ class Mongo {
     return result != null;
   }
 
-  Future<void> createProject(String userId, String name) async {
+  Future<String?> createProject(String userId, String name) async {
+    final publicKey = await getKey(userId);
+    if (publicKey == null) return null;
+
+    final key = generateKey();
+    final encryptedKey = encryptPublic(publicKey, key);
+
     final userProjects = projects.collection(userId);
     await userProjects.insertOne({
       'name': name,
       'owner': userId,
+      'keys': {userId: encryptedKey},
       'created_at': DateTime.now().millisecondsSinceEpoch ~/ 1000
     });
+    return encryptedKey;
+  }
+
+  Future<String?> getKey(String userId) async {
+    final key = await keys.findOne(where.eq('userId', userId));
+    return key?['key'];
   }
 }

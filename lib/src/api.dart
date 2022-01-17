@@ -71,9 +71,14 @@ class Api {
               body: 'User already has project named $name');
         }
 
-        await mongo.createProject(userId, name);
+        final encryptedKey = await mongo.createProject(userId, name);
+        if (encryptedKey == null) {
+          return Response.internalServerError(
+              body: 'Something went wrong creating project $name...');
+        }
+
         return Response.ok(
-          'Successfully created project',
+          encryptedKey,
         );
       } on FormatException {
         return Response(HttpStatus.badRequest,
