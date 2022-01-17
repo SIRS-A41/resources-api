@@ -49,6 +49,39 @@ class Api {
       }
     });
 
+    router.post('/getPublicKey', (Request req) async {
+      final jsonData = await req.readAsString();
+
+      if (jsonData.isEmpty) {
+        return Response(HttpStatus.badRequest,
+            body: 'Provide an username as {user: <username>}');
+      }
+
+      try {
+        final data = json.decode(jsonData) as Map<String, dynamic>;
+        if (!data.containsKey('user')) {
+          return Response(HttpStatus.badRequest,
+              body: 'Provide an username as {user: <username>}');
+        }
+        final userId = data['user'];
+
+        if (!await mongo.hasUserKey(userId)) {
+          return Response.ok('');
+        }
+
+        final key = await mongo.getPublicKey(userId);
+
+        return Response.ok(
+          key,
+        );
+      } on FormatException {
+        return Response(HttpStatus.badRequest,
+            body: 'Data is not a valid JSON.');
+      } catch (e) {
+        print(e);
+        return Response.internalServerError();
+      }
+    });
     router.post('/create', (Request req) async {
       final userId = req.context['userId'] as String;
       final jsonData = await req.readAsString();
@@ -71,14 +104,54 @@ class Api {
               body: 'User already has project named $name');
         }
 
-        final encryptedKey = await mongo.createProject(userId, name);
-        if (encryptedKey == null) {
+        final projectData = await mongo.createProject(userId, name);
+        if (projectData == null) {
           return Response.internalServerError(
               body: 'Something went wrong creating project $name...');
         }
 
         return Response.ok(
-          encryptedKey,
+          jsonEncode(projectData),
+        );
+      } on FormatException {
+        return Response(HttpStatus.badRequest,
+            body: 'Data is not a valid JSON.');
+      } catch (e) {
+        print(e);
+        return Response.internalServerError();
+      }
+    });
+
+    router.post('/clone', (Request req) async {
+      final userId = req.context['userId'] as String;
+      final jsonData = await req.readAsString();
+
+      if (jsonData.isEmpty) {
+        return Response(HttpStatus.badRequest,
+            body: 'Provide a project name {name: <project-name>}');
+      }
+
+      try {
+        final data = json.decode(jsonData) as Map<String, dynamic>;
+        if (!data.containsKey('name')) {
+          return Response(HttpStatus.badRequest,
+              body: 'Provide a project name {name: <project-name>}');
+        }
+        final name = data['name'];
+
+        if (!await mongo.userHasProject(userId, name)) {
+          return Response(HttpStatus.badRequest,
+              body: 'No project named $name');
+        }
+
+        final projectData = await mongo.getProjectData(userId, name);
+        if (projectData == null) {
+          return Response.internalServerError(
+              body: 'Something went wrong cloning project $name...');
+        }
+
+        return Response.ok(
+          jsonEncode(projectData),
         );
       } on FormatException {
         return Response(HttpStatus.badRequest,

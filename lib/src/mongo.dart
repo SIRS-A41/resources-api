@@ -35,13 +35,20 @@ class Mongo {
     });
   }
 
+  Future<String?> getPublicKey(String userId) async {
+    final result = await keys.findOne(where.eq('userId', userId));
+    if (result == null) return null;
+
+    return result['key'];
+  }
+
   Future<bool> userHasProject(String userId, String name) async {
     final userProjects = projects.collection(userId);
     final result = await userProjects.findOne(where.eq('name', name));
     return result != null;
   }
 
-  Future<String?> createProject(String userId, String name) async {
+  Future<Map<String, String>?> createProject(String userId, String name) async {
     final publicKey = await getKey(userId);
     if (publicKey == null) return null;
 
@@ -49,13 +56,30 @@ class Mongo {
     final encryptedKey = encryptPublic(publicKey, key);
 
     final userProjects = projects.collection(userId);
-    await userProjects.insertOne({
+    final result = await userProjects.insertOne({
       'name': name,
       'owner': userId,
       'keys': {userId: encryptedKey},
       'created_at': DateTime.now().millisecondsSinceEpoch ~/ 1000
     });
-    return encryptedKey;
+    return {
+      'key': encryptedKey,
+      'id': (result.document!['_id'] as ObjectId).$oid,
+    };
+  }
+
+  Future<Map<String, String>?> getProjectData(
+      String userId, String name) async {
+    final userProjects = projects.collection(userId);
+    final result = await userProjects.findOne(where.eq('name', name));
+
+    final encryptedKey = result!['keys'][userId];
+    final id = (result['_id'] as ObjectId).$oid;
+
+    return {
+      'key': encryptedKey,
+      'id': id,
+    };
   }
 
   Future<String?> getKey(String userId) async {

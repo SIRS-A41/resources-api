@@ -13,3 +13,4 @@ config.g.dart
 
 data/mongodb/*
 data/redis/*
+.vscode
