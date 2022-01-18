@@ -42,10 +42,50 @@ class Mongo {
     return result['key'];
   }
 
-  Future<bool> userHasProject(String userId, String name) async {
+  Future<bool> userHasProject(String userId, String name,
+      [String? owner]) async {
     final userProjects = projects.collection(userId);
     final result = await userProjects.findOne(where.eq('name', name));
     return result != null;
+  }
+
+  Future<bool> userHasProjectId(String userId, String projectId) async {
+    final userProjects = projects.collection(userId);
+    final result =
+        await userProjects.findOne(where.eq('_id', ObjectId.parse(projectId)));
+    return result != null;
+  }
+
+  Future<bool> userSharedProjectWith(
+      String userId, String projectId, String newUserId) async {
+    final userProjects = projects.collection(userId);
+    final result =
+        await userProjects.findOne(where.eq('_id', ObjectId.parse(projectId)));
+    if (result == null) return false;
+
+    final sharedWith = List<String>.from((result['shared'] ?? []));
+    return sharedWith.contains(newUserId);
+  }
+
+  Future<bool> shareProject(String userId, String projectId, String newUserId,
+      String encryptedKey) async {
+    final result = await getProjectDataById(userId, projectId);
+    if (result == null) return false;
+
+    final newUserProjects = projects.collection(newUserId);
+    await newUserProjects.insertOne({
+      'name': "$userId/${result['name']}",
+      'key': encryptedKey,
+      'created_at': DateTime.now().millisecondsSinceEpoch ~/ 1000
+    });
+
+    final userProjects = projects.collection(userId);
+    final newShared = List<String>.from(result['shared'] ?? [])..add(newUserId);
+
+    await userProjects.updateOne(where.eq('_id', ObjectId.parse(projectId)),
+        modify.set('shared', newShared));
+
+    return true;
   }
 
   Future<Map<String, String>?> createProject(String userId, String name) async {
@@ -58,9 +98,9 @@ class Mongo {
     final userProjects = projects.collection(userId);
     final result = await userProjects.insertOne({
       'name': name,
-      'owner': userId,
-      'keys': {userId: encryptedKey},
-      'created_at': DateTime.now().millisecondsSinceEpoch ~/ 1000
+      'key': encryptedKey,
+      'created_at': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      'shared': [],
     });
     return {
       'key': encryptedKey,
@@ -73,10 +113,29 @@ class Mongo {
     final userProjects = projects.collection(userId);
     final result = await userProjects.findOne(where.eq('name', name));
 
-    final encryptedKey = result!['keys'][userId];
+    final encryptedKey = result!['key'];
     final id = (result['_id'] as ObjectId).$oid;
 
     return {
+      'key': encryptedKey,
+      'id': id,
+    };
+  }
+
+  Future<Map<String, dynamic>?> getProjectDataById(
+      String userId, String projectId) async {
+    final userProjects = projects.collection(userId);
+    final result =
+        await userProjects.findOne(where.eq('_id', ObjectId.parse(projectId)));
+
+    final name = result!['name'];
+    final sharedWith = result['shared'];
+    final encryptedKey = result['key'];
+    final id = (result['_id'] as ObjectId).$oid;
+
+    return {
+      'name': name,
+      'shared': sharedWith,
       'key': encryptedKey,
       'id': id,
     };

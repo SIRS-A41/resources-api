@@ -82,6 +82,7 @@ class Api {
         return Response.internalServerError();
       }
     });
+
     router.post('/create', (Request req) async {
       final userId = req.context['userId'] as String;
       final jsonData = await req.readAsString();
@@ -97,7 +98,10 @@ class Api {
           return Response(HttpStatus.badRequest,
               body: 'Provide a project name {name: <project-name>}');
         }
-        final name = data['name'];
+        final name = data['name'] as String;
+        if (name.contains('/')) {
+          return Response(HttpStatus.badRequest, body: 'Invalid project name');
+        }
 
         if (await mongo.userHasProject(userId, name)) {
           return Response(HttpStatus.badRequest,
@@ -113,6 +117,54 @@ class Api {
         return Response.ok(
           jsonEncode(projectData),
         );
+      } on FormatException {
+        return Response(HttpStatus.badRequest,
+            body: 'Data is not a valid JSON.');
+      } catch (e) {
+        print(e);
+        return Response.internalServerError();
+      }
+    });
+
+    router.post('/share', (Request req) async {
+      final userId = req.context['userId'] as String;
+      final jsonData = await req.readAsString();
+
+      if (jsonData.isEmpty) {
+        return Response(HttpStatus.badRequest,
+            body: 'Provide: project, user, key');
+      }
+
+      try {
+        final data = json.decode(jsonData) as Map<String, dynamic>;
+        if (!data.containsKey('project') ||
+            !data.containsKey('user') ||
+            !data.containsKey('key')) {
+          return Response(HttpStatus.badRequest,
+              body: 'Provide: project, user, key');
+        }
+        final projectId = data['project'];
+        final newUserId = data['user'];
+        final encryptedKey = data['key'];
+
+        if (!await mongo.userHasProjectId(userId, projectId)) {
+          return Response(HttpStatus.badRequest,
+              body: 'User does not own this project');
+        }
+
+        if (await mongo.userSharedProjectWith(userId, projectId, newUserId)) {
+          return Response(HttpStatus.badRequest,
+              body: 'User already shared this project with the provided user');
+        }
+
+        final result = await mongo.shareProject(
+            userId, projectId, newUserId, encryptedKey);
+        if (!result) {
+          return Response.internalServerError(
+              body: 'Something went wrong sharing project...');
+        }
+
+        return Response.ok('');
       } on FormatException {
         return Response(HttpStatus.badRequest,
             body: 'Data is not a valid JSON.');

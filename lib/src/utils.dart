@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../server.dart';
 
-const String AUTH_API_HOSTNAME = '192.168.1.112:8000';
+const String AUTH_API_HOSTNAME = '192.168.1.112:8080';
 const String BASIC_AUTHORIZATION =
     'Basic QzZFNTlCMjlBRDZEODRCMEU0RUJGQjAzNkRFNzVFMUQ6VjJaMnBBdEZhYUQ3THRVaHRHYkJOQTUraUtDajFmdysybSttNlhVaDdUWT0=';
 
