@@ -100,13 +100,8 @@ class Mongo {
     return true;
   }
 
-  Future<Map<String, String>?> createProject(String userId, String name) async {
-    final publicKey = await getKey(userId);
-    if (publicKey == null) return null;
-
-    final key = generateKey();
-    final encryptedKey = encryptPublic(publicKey, key);
-
+  Future<String?> createProject(
+      String userId, String name, String encryptedKey) async {
     final userProjects = projects.collection(userId);
     final result = await userProjects.insertOne({
       'name': name,
@@ -114,10 +109,8 @@ class Mongo {
       'created_at': DateTime.now().millisecondsSinceEpoch ~/ 1000,
       'shared': [],
     });
-    return {
-      'key': encryptedKey,
-      'id': (result.document!['_id'] as ObjectId).$oid,
-    };
+    if (result.document == null) return null;
+    return (result.document!['_id'] as ObjectId).$oid;
   }
 
   Future<Map<String, String>?> getProjectData(

@@ -89,18 +89,23 @@ class Api {
 
       if (jsonData.isEmpty) {
         return Response(HttpStatus.badRequest,
-            body: 'Provide a project name {name: <project-name>}');
+            body: 'Provide a project name and encrypted key');
       }
 
       try {
         final data = json.decode(jsonData) as Map<String, dynamic>;
-        if (!data.containsKey('name')) {
+        if (!data.containsKey('name') || !data.containsKey('key')) {
           return Response(HttpStatus.badRequest,
-              body: 'Provide a project name {name: <project-name>}');
+              body: 'Provide a project name and encrypted key');
         }
         final name = data['name'] as String;
-        if (name.contains('/')) {
+        if (name.isEmpty || name.contains('/')) {
           return Response(HttpStatus.badRequest, body: 'Invalid project name');
+        }
+
+        final key = data['key'] as String;
+        if (key.isEmpty) {
+          return Response(HttpStatus.badRequest, body: 'Invalid project key');
         }
 
         if (await mongo.userHasProject(userId, name)) {
@@ -108,15 +113,13 @@ class Api {
               body: 'User already has project named $name');
         }
 
-        final projectData = await mongo.createProject(userId, name);
-        if (projectData == null) {
+        final projectId = await mongo.createProject(userId, name, key);
+        if (projectId == null) {
           return Response.internalServerError(
               body: 'Something went wrong creating project $name...');
         }
 
-        return Response.ok(
-          jsonEncode(projectData),
-        );
+        return Response.ok(projectId);
       } on FormatException {
         return Response(HttpStatus.badRequest,
             body: 'Data is not a valid JSON.');

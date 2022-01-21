@@ -5,9 +5,11 @@ import 'package:http/http.dart' as http;
 
 import '../server.dart';
 
-const String AUTH_API_HOSTNAME = '192.168.1.112:8080';
 const String BASIC_AUTHORIZATION =
     'Basic QzZFNTlCMjlBRDZEODRCMEU0RUJGQjAzNkRFNzVFMUQ6VjJaMnBBdEZhYUQ3THRVaHRHYkJOQTUraUtDajFmdysybSttNlhVaDdUWT0=';
+final AUTH_IP = Platform.environment['AUTH_IP'];
+// final AUTH_API_HOSTNAME = '$AUTH_IP:8080';
+final AUTH_API_HOSTNAME = '194.210.62.182:8080';
 
 Middleware handleCors() {
   const corsHeaders = {
@@ -88,6 +90,7 @@ Middleware logUserRequests() {
 
 Future<String?> verifyJwt(String token) async {
   final url = Uri.http(AUTH_API_HOSTNAME, '/auth/validate');
+  print(url);
   final response = await http.post(
     url,
     headers: {
