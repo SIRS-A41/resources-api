@@ -214,6 +214,47 @@ class Api {
       }
     });
 
+    router.post('/push', (Request req) async {
+      final userId = req.context['userId'] as String;
+      return Response.ok("");
+      final jsonData = await req.readAsString();
+
+      if (jsonData.isEmpty) {
+        return Response(HttpStatus.badRequest,
+            body: 'Provide a project name {name: <project-name>}');
+      }
+
+      try {
+        final data = json.decode(jsonData) as Map<String, dynamic>;
+        if (!data.containsKey('name')) {
+          return Response(HttpStatus.badRequest,
+              body: 'Provide a project name {name: <project-name>}');
+        }
+        final name = data['name'];
+
+        if (!await mongo.userHasProject(userId, name)) {
+          return Response(HttpStatus.badRequest,
+              body: 'No project named $name');
+        }
+
+        final projectData = await mongo.getProjectData(userId, name);
+        if (projectData == null) {
+          return Response.internalServerError(
+              body: 'Something went wrong cloning project $name...');
+        }
+
+        return Response.ok(
+          jsonEncode(projectData),
+        );
+      } on FormatException {
+        return Response(HttpStatus.badRequest,
+            body: 'Data is not a valid JSON.');
+      } catch (e) {
+        print(e);
+        return Response.internalServerError();
+      }
+    });
+
     final handler =
         Pipeline().addMiddleware(checkAuthorization()).addHandler(router);
 
