@@ -56,6 +56,18 @@ class Mongo {
     return result != null;
   }
 
+  Future<bool> userOwnsProjectId(String userId, String projectId) async {
+    final userProjects = projects.collection(userId);
+    final result =
+        await userProjects.findOne(where.eq('_id', ObjectId.parse(projectId)));
+    if (result != null) {
+      final projectName = result['name'] as String;
+      return !projectName.contains('/');
+    } else {
+      return false;
+    }
+  }
+
   Future<bool> userSharedProjectWith(
       String userId, String projectId, String newUserId) async {
     final userProjects = projects.collection(userId);

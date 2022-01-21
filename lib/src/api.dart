@@ -147,7 +147,7 @@ class Api {
         final newUserId = data['user'];
         final encryptedKey = data['key'];
 
-        if (!await mongo.userHasProjectId(userId, projectId)) {
+        if (!await mongo.userOwnsProjectId(userId, projectId)) {
           return Response(HttpStatus.badRequest,
               body: 'User does not own this project');
         }

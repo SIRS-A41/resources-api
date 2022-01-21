@@ -9,7 +9,7 @@ const int KEY_LENGTH = 256;
 
 String generateKey() {
   var values = List<int>.generate(KEY_LENGTH ~/ 8, (i) => _random.nextInt(256));
-  return base64Url.encode(values);
+  return base64.encode(values);
 }
 
 String encryptPublic(String key, String plainText) {
