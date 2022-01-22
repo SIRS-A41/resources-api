@@ -2,12 +2,16 @@ import 'package:auth_api/server.dart';
 
 late HttpServer server;
 late Mongo mongo;
+late Sftp sftp;
 late Router app;
 late String clientBase64;
 
 void main(List<String> arguments) async {
   mongo = Mongo('mongodb://localhost:27017');
   await mongo.init();
+
+  sftp = Sftp(host: '192.168.1.112');
+  await sftp.init();
 
   app = Router();
   setupRequests();
@@ -30,7 +34,7 @@ void main(List<String> arguments) async {
 }
 
 void setupRequests() {
-  app.mount('/resources/', Api(mongo: mongo).router);
+  app.mount('/resources/', Api(mongo: mongo, sftp: sftp).router);
 
   app.get(
     '/hello',

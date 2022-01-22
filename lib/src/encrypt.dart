@@ -12,16 +12,33 @@ String generateKey() {
   return base64.encode(values);
 }
 
-String encryptPublic(String key, String plainText) {
+// ignore: always_declare_return_types
+_parsePublicKey(String key) {
   // ignore: prefer_single_quotes
-  final publicKey = parseRSAPublicKeyPEM("""
+  return parseRSAPublicKeyPEM("""
   -----BEGIN PUBLIC KEY-----
   $key
   -----END PUBLIC KEY-----
   """);
+}
+
+String encryptPublic(String key, String plainText) {
+  final publicKey = _parsePublicKey(key);
   final encrypter = Encrypter(RSA(publicKey: publicKey));
 
   final encrypted = encrypter.encrypt(plainText);
 
   return encrypted.base64;
+}
+
+bool verifySignature(List<int> fileBytes, String signature, String publicKey) {
+  final signer = Signer(
+    RSASigner(
+      RSASignDigest.SHA256,
+      publicKey: _parsePublicKey(publicKey),
+    ),
+  );
+
+  final _signature = Encrypted.fromBase64(signature);
+  return signer.verifyBytes(fileBytes, _signature);
 }

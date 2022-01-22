@@ -1,4 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
+
+import 'package:mongo_dart/mongo_dart.dart';
 
 import '../server.dart';
 
@@ -6,9 +9,13 @@ final RegExp regexDocumentPath = RegExp(r'^[a-zA-Z0-9_-]+\/[a-z0-9]+$');
 final RegExp regexCollectionPath = RegExp(r'^[a-zA-Z0-9_-]+\/?$');
 
 class Api {
-  Api({required this.mongo});
+  Api({
+    required this.mongo,
+    required this.sftp,
+  });
 
   final Mongo mongo;
+  final Sftp sftp;
 
   Handler get router {
     final router = Router();
@@ -217,45 +224,124 @@ class Api {
       }
     });
 
-    router.post('/push', (Request req) async {
-      final userId = req.context['userId'] as String;
-      return Response.ok("");
-      final jsonData = await req.readAsString();
-
-      if (jsonData.isEmpty) {
-        return Response(HttpStatus.badRequest,
-            body: 'Provide a project name {name: <project-name>}');
+    router.post('/upload', (Request request) async {
+      final userId = request.context['userId'] as String;
+      final contentType = request.headers['content-type'];
+      if (contentType == null) {
+        return Response(400, body: 'Missing content-type');
       }
 
-      try {
-        final data = json.decode(jsonData) as Map<String, dynamic>;
-        if (!data.containsKey('name')) {
-          return Response(HttpStatus.badRequest,
-              body: 'Provide a project name {name: <project-name>}');
-        }
-        final name = data['name'];
-
-        if (!await mongo.userHasProject(userId, name)) {
-          return Response(HttpStatus.badRequest,
-              body: 'No project named $name');
-        }
-
-        final projectData = await mongo.getProjectData(userId, name);
-        if (projectData == null) {
-          return Response.internalServerError(
-              body: 'Something went wrong cloning project $name...');
-        }
-
-        return Response.ok(
-          jsonEncode(projectData),
-        );
-      } on FormatException {
-        return Response(HttpStatus.badRequest,
-            body: 'Data is not a valid JSON.');
-      } catch (e) {
-        print(e);
-        return Response.internalServerError();
+      final mediaType = MediaType.parse(contentType);
+      if (mediaType.mimeType != 'multipart/form-data') {
+        return Response(400, body: 'Invalid content-type');
       }
+
+      final boundary = mediaType.parameters['boundary'];
+      if (boundary == null) {
+        return Response(400, body: 'Missing boundary');
+      }
+
+      final payload = request.read();
+      final parts = MimeMultipartTransformer(boundary).bind(payload);
+      // .where((part) {
+      // return part.headers['content-type'] == 'application/octet-stream';
+      // });
+
+      final partsIterator = StreamIterator(parts);
+      String? projectId;
+      String? iv;
+      String? signature;
+      final fileBytes = <int>[];
+      File? file;
+      while (await partsIterator.moveNext()) {
+        final part = partsIterator.current;
+
+        if (!part.headers.containsKey('content-disposition')) {
+          return Response(400, body: 'Missing content-disposition');
+        }
+
+        final header = HeaderValue.parse(part.headers['content-disposition']!);
+        if (!header.parameters.containsKey('name')) {
+          return Response(400, body: 'Missing form entry name');
+        }
+        final name = header.parameters['name'];
+        switch (name) {
+          case 'project':
+            projectId = '';
+            final lines = part.transform(utf8.decoder);
+            await for (var line in lines) {
+              projectId = '$projectId$line';
+            }
+            break;
+          case 'iv':
+            iv = '';
+            final lines = part.transform(utf8.decoder);
+            await for (var line in lines) {
+              iv = '$iv$line';
+            }
+            break;
+          case 'signature':
+            signature = '';
+            final lines = part.transform(utf8.decoder);
+            await for (var line in lines) {
+              signature = '$signature$line';
+            }
+            break;
+          case 'file':
+            final chunksIterator = StreamIterator(part);
+
+            while (await chunksIterator.moveNext()) {
+              final chunk = chunksIterator.current;
+              fileBytes.addAll(chunk);
+            }
+            file = File('');
+            break;
+          default:
+            return Response(400, body: 'Invalid parameter $name');
+        }
+        if (file != null &&
+            iv != null &&
+            signature != null &&
+            projectId != null) {
+          print(iv);
+          print(signature);
+          print(projectId);
+          break;
+        }
+      }
+      if (signature == null || signature.isEmpty) {
+        return Response(400, body: 'Invalid signature');
+      }
+      if (iv == null || iv.isEmpty) {
+        return Response(400, body: 'Invalid AES iv');
+      }
+      if (projectId == null || projectId.isEmpty) {
+        return Response(400, body: 'Invalid projectId');
+      }
+      if (fileBytes.isEmpty) {
+        return Response(400, body: 'Invalid file');
+      }
+
+      final publicKey = await mongo.getKey(userId);
+      if (publicKey == null) {
+        return Response.forbidden('User not allowed');
+      }
+      final valid = verifySignature(fileBytes, signature, publicKey);
+      if (!valid) return Response.forbidden('Invalid file signature');
+
+      final commit = await mongo.newPush(
+          user: userId, project: projectId, signature: signature, iv: iv);
+      if (commit == null) {
+        Response.internalServerError(body: 'Failed to commit new version');
+      }
+
+      final result = await sftp.writeFile('$commit.encrypted', fileBytes);
+      if (!result) {
+        await mongo.cancelPush(userId, projectId, commit!);
+        Response.internalServerError(body: 'Failed to save project files');
+      }
+
+      return Response.ok(commit);
     });
 
     final handler =

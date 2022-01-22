@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:auth_api/src/encrypt.dart';
 import 'package:mongo_dart/mongo_dart.dart';
 
@@ -7,18 +9,21 @@ class Mongo {
   late Db test;
   late Db db;
   late Db projects;
+  late Db versions;
   late DbCollection keys;
   late String mongoUrl;
 
   Mongo(this.mongoUrl)
       : test = Db('$mongoUrl/test'),
         db = Db('$mongoUrl/db'),
-        projects = Db('$mongoUrl/projects');
+        projects = Db('$mongoUrl/projects'),
+        versions = Db('$mongoUrl/projects-versions');
 
   Future<void> init() async {
     await test.open();
     await db.open();
     await projects.open();
+    await versions.open();
     print('Connected to database: $mongoUrl');
     keys = test.collection('public-keys');
   }
@@ -62,11 +67,13 @@ class Mongo {
         await userProjects.findOne(where.eq('_id', ObjectId.parse(projectId)));
     if (result != null) {
       final projectName = result['name'] as String;
-      return !projectName.contains('/');
+      return _getProjectOwner(projectName) == userId;
     } else {
       return false;
     }
   }
+
+  String _getProjectOwner(String projectName) => projectName.split("/").first;
 
   Future<bool> userSharedProjectWith(
       String userId, String projectId, String newUserId) async {
@@ -79,17 +86,16 @@ class Mongo {
     return sharedWith.contains(newUserId);
   }
 
+  String get now => '${DateTime.now().millisecondsSinceEpoch ~/ 1000}';
+
   Future<bool> shareProject(String userId, String projectId, String newUserId,
       String encryptedKey) async {
     final result = await getProjectDataById(userId, projectId);
     if (result == null) return false;
 
     final newUserProjects = projects.collection(newUserId);
-    await newUserProjects.insertOne({
-      'name': "$userId/${result['name']}",
-      'key': encryptedKey,
-      'created_at': DateTime.now().millisecondsSinceEpoch ~/ 1000
-    });
+    await newUserProjects.insertOne(
+        {'name': result['name'], 'key': encryptedKey, 'created_at': now});
 
     final userProjects = projects.collection(userId);
     final newShared = List<String>.from(result['shared'] ?? [])..add(newUserId);
@@ -104,7 +110,7 @@ class Mongo {
       String userId, String name, String encryptedKey) async {
     final userProjects = projects.collection(userId);
     final result = await userProjects.insertOne({
-      'name': name,
+      'name': "$userId/$name",
       'key': encryptedKey,
       'created_at': DateTime.now().millisecondsSinceEpoch ~/ 1000,
       'shared': [],
@@ -149,5 +155,43 @@ class Mongo {
   Future<String?> getKey(String userId) async {
     final key = await keys.findOne(where.eq('userId', userId));
     return key?['key'];
+  }
+
+  Future<String?> newPush(
+      {required String user,
+      required String project,
+      required String signature,
+      required String iv}) async {
+    final result = await getProjectDataById(user, project);
+    if (result == null) return null;
+
+    final projectName = result['name'] as String;
+
+    return await addVersion(
+        userId: user, projectName: projectName, iv: iv, signature: signature);
+  }
+
+  Future<void> cancelPush(String user, String projectId, String commit) async {
+    final result = await getProjectDataById(user, projectId);
+    if (result == null) return null;
+    final projectName = result['name'] as String;
+    final project = versions.collection(projectName);
+    await project.deleteOne(where.eq('_id', ObjectId.parse(commit)));
+  }
+
+  Future<String> addVersion({
+    required String userId,
+    required String projectName,
+    required String signature,
+    required String iv,
+  }) async {
+    final project = versions.collection(projectName);
+    final result = await project.insertOne({
+      'user': userId,
+      'iv': iv,
+      'signature': signature,
+      'timestamp': now,
+    });
+    return (result.document!['_id'] as ObjectId).$oid;
   }
 }

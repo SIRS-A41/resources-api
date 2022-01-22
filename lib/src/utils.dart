@@ -9,7 +9,7 @@ const String BASIC_AUTHORIZATION =
     'Basic QzZFNTlCMjlBRDZEODRCMEU0RUJGQjAzNkRFNzVFMUQ6VjJaMnBBdEZhYUQ3THRVaHRHYkJOQTUraUtDajFmdysybSttNlhVaDdUWT0=';
 final AUTH_IP = Platform.environment['AUTH_IP'];
 // final AUTH_API_HOSTNAME = '$AUTH_IP:8080';
-final AUTH_API_HOSTNAME = '194.210.62.182:8080';
+final AUTH_API_HOSTNAME = '192.168.1.112:8080';
 
 Middleware handleCors() {
   const corsHeaders = {
@@ -50,7 +50,7 @@ Middleware handleAuth() {
           final updatedRequest = request.change(context: {
             'userId': userId,
           });
-          return await innerHandler(updatedRequest);
+          return innerHandler(updatedRequest);
         } else {
           return Response.forbidden(
             'Not authorized to perform this action.',
