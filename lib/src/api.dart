@@ -303,9 +303,6 @@ class Api {
             iv != null &&
             signature != null &&
             projectId != null) {
-          print(iv);
-          print(signature);
-          print(projectId);
           break;
         }
       }
@@ -326,22 +323,23 @@ class Api {
       if (publicKey == null) {
         return Response.forbidden('User not allowed');
       }
-      final valid = verifySignature(fileBytes, signature, publicKey);
-      if (!valid) return Response.forbidden('Invalid file signature');
+      final hashHex = verifySignature(fileBytes, signature, publicKey);
+      if (hashHex == null) return Response.forbidden('Invalid file signature');
 
-      final commit = await mongo.newPush(
-          user: userId, project: projectId, signature: signature, iv: iv);
-      if (commit == null) {
-        Response.internalServerError(body: 'Failed to commit new version');
-      }
-
-      final result = await sftp.writeFile('$commit.encrypted', fileBytes);
+      final result = await sftp.writeFile(hashHex, fileBytes);
       if (!result) {
-        await mongo.cancelPush(userId, projectId, commit!);
         Response.internalServerError(body: 'Failed to save project files');
       }
 
-      return Response.ok(commit);
+      await mongo.newPush(
+        user: userId,
+        project: projectId,
+        signature: signature,
+        iv: iv,
+        hash: hashHex,
+      );
+
+      return Response.ok(hashHex);
     });
 
     final handler =

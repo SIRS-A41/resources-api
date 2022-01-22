@@ -160,6 +160,7 @@ class Mongo {
   Future<String?> newPush(
       {required String user,
       required String project,
+      required String hash,
       required String signature,
       required String iv}) async {
     final result = await getProjectDataById(user, project);
@@ -168,15 +169,20 @@ class Mongo {
     final projectName = result['name'] as String;
 
     return await addVersion(
-        userId: user, projectName: projectName, iv: iv, signature: signature);
+      userId: user,
+      projectName: projectName,
+      iv: iv,
+      signature: signature,
+      hash: hash,
+    );
   }
 
-  Future<void> cancelPush(String user, String projectId, String commit) async {
+  Future<void> cancelPush(String user, String projectId, String hash) async {
     final result = await getProjectDataById(user, projectId);
     if (result == null) return null;
     final projectName = result['name'] as String;
     final project = versions.collection(projectName);
-    await project.deleteOne(where.eq('_id', ObjectId.parse(commit)));
+    await project.deleteOne(where.eq('hash', ObjectId.parse(hash)));
   }
 
   Future<String> addVersion({
@@ -184,11 +190,13 @@ class Mongo {
     required String projectName,
     required String signature,
     required String iv,
+    required String hash,
   }) async {
     final project = versions.collection(projectName);
     final result = await project.insertOne({
       'user': userId,
       'iv': iv,
+      'hash': hash,
       'signature': signature,
       'timestamp': now,
     });

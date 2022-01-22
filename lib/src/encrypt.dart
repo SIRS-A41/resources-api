@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:crypto/crypto.dart';
 import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
 import 'package:encrypt/encrypt.dart';
 
@@ -31,7 +32,13 @@ String encryptPublic(String key, String plainText) {
   return encrypted.base64;
 }
 
-bool verifySignature(List<int> fileBytes, String signature, String publicKey) {
+List<int> _fileHash(List<int> fileBytes) {
+  final digest = sha256.convert(fileBytes);
+  return digest.bytes;
+}
+
+String? verifySignature(
+    List<int> fileBytes, String signature, String publicKey) {
   final signer = Signer(
     RSASigner(
       RSASignDigest.SHA256,
@@ -40,5 +47,13 @@ bool verifySignature(List<int> fileBytes, String signature, String publicKey) {
   );
 
   final _signature = Encrypted.fromBase64(signature);
-  return signer.verifyBytes(fileBytes, _signature);
+  final hash = _fileHash(fileBytes);
+  final valid = signer.verifyBytes(hash, _signature);
+  if (valid) {
+    final hex = hash.map((e) => e.toRadixString(16).padLeft(2, '0')).join();
+    // return base64.encode(hash);
+    return hex;
+  } else {
+    return null;
+  }
 }
