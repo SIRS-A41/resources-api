@@ -152,6 +152,13 @@ class Mongo {
     };
   }
 
+  Future<Map<String, dynamic>?> latestVersion(String projectName) async {
+    final project = versions.collection(projectName);
+    final result =
+        await project.findOne(where.sortBy('timestamp', descending: true));
+    return result;
+  }
+
   Future<bool> projectHasVersion(String projectName, String version) async {
     final project = versions.collection(projectName);
     final result = await project.findOne(where.eq('version', version));
@@ -160,8 +167,9 @@ class Mongo {
 
   Future<List<Map<String, dynamic>>> projectVersions(String projectName) async {
     final project = versions.collection(projectName);
-    final result = (await project.find(where.sortBy('timestamp')).toList())
-        .reversed
+    final result = (await project
+            .find(where.sortBy('timestamp', descending: true))
+            .toList())
         .map((Map<String, dynamic> data) => {
               'user': data["user"],
               'version': data["version"],

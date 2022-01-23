@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:mongo_dart/mongo_dart.dart';
 
@@ -118,6 +119,12 @@ class Api {
         if (await mongo.userHasProject(userId, name)) {
           return Response(HttpStatus.badRequest,
               body: 'User already has project named $name');
+        }
+
+        final result = await sftp.createProject(name);
+        if (!result) {
+          return Response.internalServerError(
+              body: 'Something went wrong creating project $name...');
         }
 
         final projectId = await mongo.createProject(userId, name, key);
@@ -262,6 +269,63 @@ class Api {
       }
     });
 
+    router.post('/pull', (Request req) async {
+      final userId = req.context['userId'] as String;
+      final jsonData = await req.readAsString();
+
+      if (jsonData.isEmpty) {
+        return Response(HttpStatus.badRequest, body: 'Provide a project id');
+      }
+
+      try {
+        final data = json.decode(jsonData) as Map<String, dynamic>;
+        if (!data.containsKey('project')) {
+          return Response(HttpStatus.badRequest, body: 'Provide a project id');
+        }
+        final project = data['project'];
+
+        final projectData = await mongo.getProjectDataById(userId, project);
+        if (projectData == null) {
+          return Response(HttpStatus.badRequest,
+              body: 'No project with this id');
+        }
+
+        final name = projectData['name'];
+        if (name == null) {
+          return Response.internalServerError(
+              body: 'Something went wrong verifying project name');
+        }
+
+        final latest = await mongo.latestVersion(name);
+        if (latest == null) {
+          return Response(HttpStatus.badRequest,
+              body: 'Project has no commits');
+        }
+        final version = latest['version'];
+        final signature = latest['signature'];
+        final iv = latest['iv'];
+        final user = latest['user'];
+
+        final file = await sftp.readFile(name, version);
+        if (file == null) {
+          return Response.internalServerError(
+              body: 'Something went wrong reading files from server');
+        }
+
+        return Response(
+          HttpStatus.partialContent,
+          body: file,
+          headers: {'X-signature': signature, 'X-user': user, 'X-iv': iv},
+        );
+      } on FormatException {
+        return Response(HttpStatus.badRequest,
+            body: 'Data is not a valid JSON.');
+      } catch (e) {
+        print(e);
+        return Response.internalServerError();
+      }
+    });
+
     router.post('/hasCommit', (Request req) async {
       final userId = req.context['userId'] as String;
       final jsonData = await req.readAsString();
@@ -303,7 +367,7 @@ class Api {
       }
     });
 
-    router.post('/upload', (Request request) async {
+    router.post('/push', (Request request) async {
       final userId = request.context['userId'] as String;
       final contentType = request.headers['content-type'];
       if (contentType == null) {
@@ -429,7 +493,8 @@ class Api {
 
       final result = await sftp.writeFile(projectName, version, fileBytes);
       if (!result) {
-        Response.internalServerError(body: 'Failed to save project files');
+        return Response.internalServerError(
+            body: 'Failed to save project files');
       }
 
       await mongo.newPush(
