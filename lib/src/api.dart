@@ -224,6 +224,85 @@ class Api {
       }
     });
 
+    router.post('/versions', (Request req) async {
+      final userId = req.context['userId'] as String;
+      final jsonData = await req.readAsString();
+
+      if (jsonData.isEmpty) {
+        return Response(HttpStatus.badRequest, body: 'Provide a project id');
+      }
+
+      try {
+        final data = json.decode(jsonData) as Map<String, dynamic>;
+        if (!data.containsKey('project')) {
+          return Response(HttpStatus.badRequest, body: 'Provide a project id');
+        }
+        final project = data['project'];
+
+        final projectData = await mongo.getProjectDataById(userId, project);
+        if (projectData == null) {
+          return Response(HttpStatus.badRequest,
+              body: 'No project with this id');
+        }
+
+        final name = projectData['name'];
+        if (name == null) {
+          return Response.internalServerError(
+              body: 'Something went wrong verifying project name');
+        }
+
+        final result = await mongo.projectVersions(name);
+        return Response.ok(json.encode({'history': result}));
+      } on FormatException {
+        return Response(HttpStatus.badRequest,
+            body: 'Data is not a valid JSON.');
+      } catch (e) {
+        print(e);
+        return Response.internalServerError();
+      }
+    });
+
+    router.post('/hasCommit', (Request req) async {
+      final userId = req.context['userId'] as String;
+      final jsonData = await req.readAsString();
+
+      if (jsonData.isEmpty) {
+        return Response(HttpStatus.badRequest,
+            body: 'Provide a project id and commit version');
+      }
+
+      try {
+        final data = json.decode(jsonData) as Map<String, dynamic>;
+        if (!data.containsKey('version') || !data.containsKey('project')) {
+          return Response(HttpStatus.badRequest,
+              body: 'Provide a project id and commit version');
+        }
+        final project = data['project'];
+        final version = data['version'];
+
+        final projectData = await mongo.getProjectDataById(userId, project);
+        if (projectData == null) {
+          return Response(HttpStatus.badRequest,
+              body: 'No project with this id');
+        }
+
+        final name = projectData['name'];
+        if (name == null) {
+          return Response.internalServerError(
+              body: 'Something went wrong verifying project name');
+        }
+
+        final result = await mongo.projectHasVersion(name, version);
+        return Response.ok(result.toString());
+      } on FormatException {
+        return Response(HttpStatus.badRequest,
+            body: 'Data is not a valid JSON.');
+      } catch (e) {
+        print(e);
+        return Response.internalServerError();
+      }
+    });
+
     router.post('/upload', (Request request) async {
       final userId = request.context['userId'] as String;
       final contentType = request.headers['content-type'];
@@ -251,6 +330,7 @@ class Api {
       String? projectId;
       String? iv;
       String? signature;
+      String? version;
       final fileBytes = <int>[];
       File? file;
       while (await partsIterator.moveNext()) {
@@ -280,6 +360,13 @@ class Api {
               iv = '$iv$line';
             }
             break;
+          case 'version':
+            version = '';
+            final lines = part.transform(utf8.decoder);
+            await for (var line in lines) {
+              version = '$version$line';
+            }
+            break;
           case 'signature':
             signature = '';
             final lines = part.transform(utf8.decoder);
@@ -301,10 +388,14 @@ class Api {
         }
         if (file != null &&
             iv != null &&
+            version != null &&
             signature != null &&
             projectId != null) {
           break;
         }
+      }
+      if (version == null || version.isEmpty) {
+        return Response(400, body: 'Invalid version');
       }
       if (signature == null || signature.isEmpty) {
         return Response(400, body: 'Invalid signature');
@@ -315,6 +406,12 @@ class Api {
       if (projectId == null || projectId.isEmpty) {
         return Response(400, body: 'Invalid projectId');
       }
+      final projectName =
+          (await mongo.getProjectDataById(userId, projectId))?['name'];
+      if (projectName == null) {
+        return Response(400, body: 'Invalid projectId');
+      }
+
       if (fileBytes.isEmpty) {
         return Response(400, body: 'Invalid file');
       }
@@ -326,7 +423,11 @@ class Api {
       final hashHex = verifySignature(fileBytes, signature, publicKey);
       if (hashHex == null) return Response.forbidden('Invalid file signature');
 
-      final result = await sftp.writeFile(hashHex, fileBytes);
+      if (await mongo.projectHasVersion(projectName, version)) {
+        return Response(400, body: 'Project already has commit $version');
+      }
+
+      final result = await sftp.writeFile(projectName, version, fileBytes);
       if (!result) {
         Response.internalServerError(body: 'Failed to save project files');
       }
@@ -336,7 +437,7 @@ class Api {
         project: projectId,
         signature: signature,
         iv: iv,
-        hash: hashHex,
+        version: version,
       );
 
       return Response.ok(hashHex);

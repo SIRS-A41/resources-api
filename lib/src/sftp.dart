@@ -18,9 +18,12 @@ class Sftp {
     sftp = await client.sftp();
   }
 
-  Future<bool> writeFile(String filename, List<int> fileBytes) async {
+  Future<bool> writeFile(
+      String project, String filename, List<int> fileBytes) async {
     try {
-      final file = await sftp.open(filename,
+      await sftp.mkdir(project.split('/').first);
+      await sftp.mkdir(project);
+      final file = await sftp.open('$project/$filename',
           mode: SftpFileOpenMode.create | SftpFileOpenMode.write);
       await file.writeBytes(Uint8List.fromList(fileBytes));
       return true;

@@ -152,6 +152,24 @@ class Mongo {
     };
   }
 
+  Future<bool> projectHasVersion(String projectName, String version) async {
+    final project = versions.collection(projectName);
+    final result = await project.findOne(where.eq('version', version));
+    return result != null;
+  }
+
+  Future<List<Map<String, dynamic>>> projectVersions(String projectName) async {
+    final project = versions.collection(projectName);
+    final result = (await project.find(where.sortBy('timestamp')).toList())
+        .reversed
+        .map((Map<String, dynamic> data) => {
+              'user': data["user"],
+              'version': data["version"],
+              'timestamp': data["timestamp"]
+            });
+    return result.toList();
+  }
+
   Future<String?> getKey(String userId) async {
     final key = await keys.findOne(where.eq('userId', userId));
     return key?['key'];
@@ -160,7 +178,7 @@ class Mongo {
   Future<String?> newPush(
       {required String user,
       required String project,
-      required String hash,
+      required String version,
       required String signature,
       required String iv}) async {
     final result = await getProjectDataById(user, project);
@@ -173,16 +191,8 @@ class Mongo {
       projectName: projectName,
       iv: iv,
       signature: signature,
-      hash: hash,
+      version: version,
     );
-  }
-
-  Future<void> cancelPush(String user, String projectId, String hash) async {
-    final result = await getProjectDataById(user, projectId);
-    if (result == null) return null;
-    final projectName = result['name'] as String;
-    final project = versions.collection(projectName);
-    await project.deleteOne(where.eq('hash', ObjectId.parse(hash)));
   }
 
   Future<String> addVersion({
@@ -190,15 +200,15 @@ class Mongo {
     required String projectName,
     required String signature,
     required String iv,
-    required String hash,
+    required String version,
   }) async {
     final project = versions.collection(projectName);
     final result = await project.insertOne({
       'user': userId,
       'iv': iv,
-      'hash': hash,
       'signature': signature,
       'timestamp': now,
+      'version': version,
     });
     return (result.document!['_id'] as ObjectId).$oid;
   }
