@@ -172,6 +172,23 @@ class Mongo {
     return result != null;
   }
 
+  Future<List<Map<String, dynamic>>> getProjects(String userId) async {
+    final userProjects = projects.collection(userId);
+    final result = (await userProjects
+            .find(where.sortBy('created_at', descending: true))
+            .toList())
+        .map((Map<String, dynamic> data) {
+      String name = data["name"];
+      if (name.split("/").first == userId) name = name.split("/").last;
+      return <String, dynamic>{
+        'name': name,
+        'created_at': data["created_at"],
+        'shared': List<String>.from(data["shared"] ?? []).join(", ")
+      };
+    });
+    return result.toList();
+  }
+
   Future<List<Map<String, dynamic>>> projectVersions(String projectName) async {
     final project = versions.collection(projectName);
     final result = (await project

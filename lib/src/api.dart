@@ -21,6 +21,21 @@ class Api {
   Handler get router {
     final router = Router();
 
+    router.get('/projects', (Request req) async {
+      final userId = req.context['userId'] as String;
+
+      try {
+        final projects = await mongo.getProjects(userId);
+
+        return Response.ok(json.encode({'projects': projects}));
+      } on FormatException {
+        return Response(HttpStatus.badRequest,
+            body: 'Data is not a valid JSON.');
+      } catch (e) {
+        print(e);
+        return Response.internalServerError();
+      }
+    });
     router.post('/setPublicKey', (Request req) async {
       final jsonData = await req.readAsString();
       final userId = req.context['userId'] as String;
