@@ -7,7 +7,7 @@ class Sftp {
   final String host;
   final int port;
 
-  Sftp({required this.host, this.port = 22}) {}
+  Sftp({required this.host, this.port = 22});
 
   Future<void> init() async {
     final client = SSHClient(

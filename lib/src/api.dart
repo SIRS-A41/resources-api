@@ -1,8 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
-
-import 'package:mongo_dart/mongo_dart.dart';
 
 import '../server.dart';
 
@@ -121,11 +118,11 @@ class Api {
           return Response(HttpStatus.badRequest,
               body: 'Provide a project name and encrypted key');
         }
-        String name = data['name'] as String;
+        var name = data['name'] as String;
         if (name.isEmpty || name.contains('/')) {
           return Response(HttpStatus.badRequest, body: 'Invalid project name');
         }
-        name = "$userId/$name";
+        name = '$userId/$name';
 
         final key = data['key'] as String;
         if (key.isEmpty) {

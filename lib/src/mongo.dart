@@ -1,6 +1,3 @@
-import 'dart:io';
-
-import 'package:auth_api/src/encrypt.dart';
 import 'package:mongo_dart/mongo_dart.dart';
 
 typedef MongoFunction = Function(Db db);
@@ -73,7 +70,7 @@ class Mongo {
     }
   }
 
-  String _getProjectOwner(String projectName) => projectName.split("/").first;
+  String _getProjectOwner(String projectName) => projectName.split('/').first;
 
   Future<bool> userSharedProjectWith(
       String userId, String projectId, String newUserId) async {
@@ -178,12 +175,12 @@ class Mongo {
             .find(where.sortBy('created_at', descending: true))
             .toList())
         .map((Map<String, dynamic> data) {
-      String name = data["name"];
-      if (name.split("/").first == userId) name = name.split("/").last;
+      String name = data['name'];
+      if (name.split('/').first == userId) name = name.split('/').last;
       return <String, dynamic>{
         'name': name,
-        'created_at': data["created_at"],
-        'shared': List<String>.from(data["shared"] ?? []).join(", ")
+        'created_at': data['created_at'],
+        'shared': List<String>.from(data['shared'] ?? []).join(', ')
       };
     });
     return result.toList();
@@ -195,9 +192,9 @@ class Mongo {
             .find(where.sortBy('timestamp', descending: true))
             .toList())
         .map((Map<String, dynamic> data) => {
-              'user': data["user"],
-              'version': data["version"],
-              'timestamp': data["timestamp"]
+              'user': data['user'],
+              'version': data['version'],
+              'timestamp': data['timestamp']
             });
     return result.toList();
   }

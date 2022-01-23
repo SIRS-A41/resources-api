@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:shelf/shelf.dart';
 import 'package:http/http.dart' as http;
 
 import '../server.dart';
