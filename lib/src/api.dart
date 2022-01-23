@@ -106,10 +106,11 @@ class Api {
           return Response(HttpStatus.badRequest,
               body: 'Provide a project name and encrypted key');
         }
-        final name = data['name'] as String;
+        String name = data['name'] as String;
         if (name.isEmpty || name.contains('/')) {
           return Response(HttpStatus.badRequest, body: 'Invalid project name');
         }
+        name = "$userId/$name";
 
         final key = data['key'] as String;
         if (key.isEmpty) {

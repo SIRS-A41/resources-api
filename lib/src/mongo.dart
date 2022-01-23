@@ -110,7 +110,7 @@ class Mongo {
       String userId, String name, String encryptedKey) async {
     final userProjects = projects.collection(userId);
     final result = await userProjects.insertOne({
-      'name': "$userId/$name",
+      'name': name,
       'key': encryptedKey,
       'created_at': DateTime.now().millisecondsSinceEpoch ~/ 1000,
       'shared': [],

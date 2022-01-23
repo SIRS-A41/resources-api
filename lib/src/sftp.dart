@@ -24,6 +24,7 @@ class Sftp {
       await sftp.mkdir(project);
       return true;
     } catch (e) {
+      print(e);
       return false;
     }
   }
