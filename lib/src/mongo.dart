@@ -152,6 +152,13 @@ class Mongo {
     };
   }
 
+  Future<Map<String, dynamic>?> getVersion(
+      String projectName, String version) async {
+    final project = versions.collection(projectName);
+    final result = await project.findOne(where.eq('version', version));
+    return result;
+  }
+
   Future<Map<String, dynamic>?> latestVersion(String projectName) async {
     final project = versions.collection(projectName);
     final result =

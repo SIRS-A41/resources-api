@@ -206,7 +206,10 @@ class Api {
           return Response(HttpStatus.badRequest,
               body: 'Provide a project name {name: <project-name>}');
         }
-        final name = data['name'];
+        String name = data['name'];
+        if (!name.contains('/')) {
+          name = '$userId/$name';
+        }
 
         if (!await mongo.userHasProject(userId, name)) {
           return Response(HttpStatus.badRequest,
@@ -283,6 +286,7 @@ class Api {
           return Response(HttpStatus.badRequest, body: 'Provide a project id');
         }
         final project = data['project'];
+        String? version = data['version'];
 
         final projectData = await mongo.getProjectDataById(userId, project);
         if (projectData == null) {
@@ -296,17 +300,26 @@ class Api {
               body: 'Something went wrong verifying project name');
         }
 
-        final latest = await mongo.latestVersion(name);
-        if (latest == null) {
-          return Response(HttpStatus.badRequest,
-              body: 'Project has no commits');
+        Map<String, dynamic>? commit;
+        if (version == null) {
+          commit = await mongo.latestVersion(name);
+          if (commit == null) {
+            return Response(HttpStatus.badRequest,
+                body: 'Project has no commits');
+          }
+          version = commit['version'];
+        } else {
+          commit = await mongo.getVersion(name, version);
+          if (commit == null) {
+            return Response(HttpStatus.badRequest,
+                body: 'Project has no version $version');
+          }
         }
-        final version = latest['version'];
-        final signature = latest['signature'];
-        final iv = latest['iv'];
-        final user = latest['user'];
+        final signature = commit['signature'];
+        final iv = commit['iv'];
+        final user = commit['user'];
 
-        final file = await sftp.readFile(name, version);
+        final file = await sftp.readFile(name, version!);
         if (file == null) {
           return Response.internalServerError(
               body: 'Something went wrong reading files from server');
