@@ -1,3 +1,4 @@
+export 'src/config.dart';
 export 'src/mongo.dart';
 export 'src/utils.dart';
 export 'src/api.dart';

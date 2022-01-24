@@ -14,5 +14,5 @@ RUN pub get --offline
 CMD []
 
 # Start server.
-EXPOSE 8080
+EXPOSE 8444
 ENTRYPOINT ["./start_server.sh"]

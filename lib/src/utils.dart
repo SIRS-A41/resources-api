@@ -4,12 +4,6 @@ import 'package:http/http.dart' as http;
 
 import '../server.dart';
 
-const String BASIC_AUTHORIZATION =
-    'Basic QzZFNTlCMjlBRDZEODRCMEU0RUJGQjAzNkRFNzVFMUQ6VjJaMnBBdEZhYUQ3THRVaHRHYkJOQTUraUtDajFmdysybSttNlhVaDdUWT0=';
-final AUTH_IP = Platform.environment['AUTH_IP'];
-// final AUTH_API_HOSTNAME = '$AUTH_IP:8080';
-final AUTH_API_HOSTNAME = '192.168.1.112:8080';
-
 Middleware handleCors() {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -30,7 +24,7 @@ Middleware handleCors() {
   );
 }
 
-Middleware handleAuth() {
+Middleware handleAuth(String localAuthIp, String basicAuthorization) {
   return (Handler innerHandler) {
     return (Request request) async {
       final authHeader = request.headers['Authorization'];
@@ -39,7 +33,8 @@ Middleware handleAuth() {
         if (authHeader.startsWith('Bearer ')) {
           final token = authHeader.substring(7);
 
-          final userId = await verifyJwt(token);
+          final userId =
+              await verifyJwt(token, localAuthIp, basicAuthorization);
           if (userId == null) {
             return Response.forbidden(
               'Not authorized to perform this action.',
@@ -87,13 +82,13 @@ Middleware logUserRequests() {
   );
 }
 
-Future<String?> verifyJwt(String token) async {
-  final url = Uri.http(AUTH_API_HOSTNAME, '/auth/validate');
-  print(url);
+Future<String?> verifyJwt(
+    String token, String localAuthIp, String basicAuthorization) async {
+  final url = Uri.http('$localAuthIp:8080', '/auth/validate');
   final response = await http.post(
     url,
     headers: {
-      'Authorization': BASIC_AUTHORIZATION,
+      'Authorization': 'Basic $basicAuthorization',
       'Content-Type': 'application/json',
     },
     body: jsonEncode(

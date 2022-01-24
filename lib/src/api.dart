@@ -3,9 +3,6 @@ import 'dart:convert';
 
 import '../server.dart';
 
-final RegExp regexDocumentPath = RegExp(r'^[a-zA-Z0-9_-]+\/[a-z0-9]+$');
-final RegExp regexCollectionPath = RegExp(r'^[a-zA-Z0-9_-]+\/?$');
-
 class Api {
   Api({
     required this.mongo,

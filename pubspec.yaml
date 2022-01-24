@@ -1,4 +1,4 @@
-name: auth_api
+name: resources_api
 description: A sample command-line application.
 
 environment:
