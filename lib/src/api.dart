@@ -335,8 +335,9 @@ class Api {
               body: 'Something went wrong reading files from server');
         }
 
-        return Response.ok(
-          file,
+        return Response(
+          HttpStatus.partialContent,
+          body: file,
           headers: {'X-signature': signature, 'X-user': user, 'X-iv': iv},
         );
       } on FormatException {
