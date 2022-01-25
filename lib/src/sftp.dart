@@ -21,6 +21,10 @@ class Sftp {
   Future<bool> createProject(String project) async {
     try {
       await sftp.mkdir(project.split('/').first);
+    } catch (e) {
+      print(e);
+    }
+    try {
       await sftp.mkdir(project);
       return true;
     } catch (e) {
