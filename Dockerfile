@@ -5,11 +5,14 @@ FROM google/dart
 WORKDIR /app
 
 ADD pubspec.* /app/
-RUN pub get
+RUN dart pub get
 ADD . /app
 
 # Ensure packages are still up-to-date if anything has changed
-RUN pub get --offline
+RUN dart pub get --offline
+
+RUN dart run build_runner clean
+RUN dart run build_runner build --delete-conflicting-outputs 
 
 CMD []
 

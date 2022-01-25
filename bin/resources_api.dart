@@ -14,18 +14,6 @@ late Sftp sftp;
 late Router app;
 late String clientBase64;
 
-SecurityContext getSecurityContext() {
-  // Bind with a secure HTTPS connection
-  final chain =
-      Platform.script.resolve('../../certificates/cert.pem').toFilePath();
-  final key =
-      Platform.script.resolve('../../certificates/key.pem').toFilePath();
-
-  return SecurityContext()
-    ..useCertificateChain(chain)
-    ..usePrivateKey(key, password: '123123');
-}
-
 void main(List<String> arguments) async {
   var bytes = utf8.encode('$CLIENT_ID:$CLIENT_SECRET');
   clientBase64 = base64.encode(bytes);
