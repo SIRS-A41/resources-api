@@ -503,16 +503,16 @@ class Api {
         return Response(400, body: 'Invalid file');
       }
 
+      if (await mongo.projectHasVersion(projectName, version)) {
+        return Response(400, body: 'Project already has commit $version');
+      }
+
       final publicKey = await mongo.getKey(userId);
       if (publicKey == null) {
         return Response.forbidden('User not allowed');
       }
       final hashHex = verifySignature(fileBytes, signature, publicKey);
       if (hashHex == null) return Response.forbidden('Invalid file signature');
-
-      if (await mongo.projectHasVersion(projectName, version)) {
-        return Response(400, body: 'Project already has commit $version');
-      }
 
       final result = await sftp.writeFile(projectName, version, fileBytes);
       if (!result) {
