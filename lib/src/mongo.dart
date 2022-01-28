@@ -208,6 +208,8 @@ class Mongo {
       {required String user,
       required String project,
       required String version,
+      required String mac,
+      required String macIv,
       required String signature,
       required String iv}) async {
     final result = await getProjectDataById(user, project);
@@ -219,6 +221,8 @@ class Mongo {
       userId: user,
       projectName: projectName,
       iv: iv,
+      mac: mac,
+      macIv: macIv,
       signature: signature,
       version: version,
     );
@@ -228,6 +232,8 @@ class Mongo {
     required String userId,
     required String projectName,
     required String signature,
+    required String mac,
+    required String macIv,
     required String iv,
     required String version,
   }) async {
@@ -236,6 +242,8 @@ class Mongo {
       'user': userId,
       'iv': iv,
       'signature': signature,
+      'mac': mac,
+      'mac-iv': macIv,
       'timestamp': now,
       'version': version,
     });

@@ -325,8 +325,9 @@ class Api {
                 body: 'Project has no version $version');
           }
         }
-        final signature = commit['signature'];
+        final signature = commit['mac'];
         final iv = commit['iv'];
+        final macIv = commit['mac-iv'];
         final user = commit['user'];
 
         final file = await sftp.readFile(name, version!);
@@ -338,7 +339,12 @@ class Api {
         return Response(
           HttpStatus.partialContent,
           body: file,
-          headers: {'X-signature': signature, 'X-user': user, 'X-iv': iv},
+          headers: {
+            'X-signature': signature,
+            'X-user': user,
+            'X-iv': iv,
+            'X-mac-iv': macIv,
+          },
         );
       } on FormatException {
         return Response(HttpStatus.badRequest,
@@ -409,14 +415,13 @@ class Api {
 
       final payload = request.read();
       final parts = MimeMultipartTransformer(boundary).bind(payload);
-      // .where((part) {
-      // return part.headers['content-type'] == 'application/octet-stream';
-      // });
 
       final partsIterator = StreamIterator(parts);
       String? projectId;
       String? iv;
       String? signature;
+      String? mac;
+      String? macIv;
       String? version;
       final fileBytes = <int>[];
       File? file;
@@ -454,6 +459,20 @@ class Api {
               version = '$version$line';
             }
             break;
+          case 'mac':
+            mac = '';
+            final lines = part.transform(utf8.decoder);
+            await for (var line in lines) {
+              mac = '$mac$line';
+            }
+            break;
+          case 'mac-iv':
+            macIv = '';
+            final lines = part.transform(utf8.decoder);
+            await for (var line in lines) {
+              macIv = '$macIv$line';
+            }
+            break;
           case 'signature':
             signature = '';
             final lines = part.transform(utf8.decoder);
@@ -476,6 +495,8 @@ class Api {
         if (file != null &&
             iv != null &&
             version != null &&
+            mac != null &&
+            macIv != null &&
             signature != null &&
             projectId != null) {
           break;
@@ -484,11 +505,17 @@ class Api {
       if (version == null || version.isEmpty) {
         return Response(400, body: 'Invalid version');
       }
+      if (mac == null || mac.isEmpty) {
+        return Response(400, body: 'Invalid mac');
+      }
       if (signature == null || signature.isEmpty) {
         return Response(400, body: 'Invalid signature');
       }
       if (iv == null || iv.isEmpty) {
         return Response(400, body: 'Invalid AES iv');
+      }
+      if (macIv == null || macIv.isEmpty) {
+        return Response(400, body: 'Invalid AES iv used for mac');
       }
       if (projectId == null || projectId.isEmpty) {
         return Response(400, body: 'Invalid projectId');
@@ -524,7 +551,9 @@ class Api {
         user: userId,
         project: projectId,
         signature: signature,
+        mac: mac,
         iv: iv,
+        macIv: macIv,
         version: version,
       );
 

@@ -37,6 +37,12 @@ List<int> _fileHash(List<int> fileBytes) {
   return digest.bytes;
 }
 
+String getHash(List<int> fileBytes) {
+  final hash = _fileHash(fileBytes);
+  final hex = hash.map((e) => e.toRadixString(16).padLeft(2, '0')).join();
+  return hex;
+}
+
 String? verifySignature(
     List<int> fileBytes, String signature, String publicKey) {
   final signer = Signer(
@@ -47,11 +53,11 @@ String? verifySignature(
   );
 
   final _signature = Encrypted.fromBase64(signature);
-  final hash = _fileHash(fileBytes);
+  // double hash
+  final hash = _fileHash(_fileHash(fileBytes));
   final valid = signer.verifyBytes(hash, _signature);
   if (valid) {
     final hex = hash.map((e) => e.toRadixString(16).padLeft(2, '0')).join();
-    // return base64.encode(hash);
     return hex;
   } else {
     return null;
